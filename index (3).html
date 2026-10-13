@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ALL Client Portal</title>
+<style>
+:root{--ink:#12263A;--paper:#F5F7F9;--card:#fff;--teal:#0E7C7B;--red:#B3261E;--line:#D5DCE2;--muted:#52606D}
+@media (prefers-color-scheme:dark){:root{--ink:#E6EDF3;--paper:#0F1B26;--card:#16273A;--teal:#3CC4C0;--red:#F2766E;--line:#2B3F55;--muted:#9AA9B8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{font-size:26px;margin:0;letter-spacing:.04em}
+h2{font-size:18px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--ink)}
+input,select{flex:1;min-width:120px}
+button{cursor:pointer;background:var(--teal);color:#fff;border-color:var(--teal);font-weight:600}
+@media (prefers-color-scheme:dark){button{color:#0F1B26}}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+button.x{background:transparent;color:var(--red);border:0;padding:2px 8px}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:5px;padding:10px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.table{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:420px}
+th,td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.inc{color:var(--teal)}.exp{color:var(--red)}
+.muted{color:var(--muted);font-size:14px}
+.msg{padding:8px 10px;border-radius:5px;margin:8px 0;background:var(--paper);border:1px solid var(--line)}
+.hide{display:none}
+label.chk{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--muted)}
+label.chk input{flex:none;min-width:0;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>ALL</h1><div id="who" class="row hide"><span id="email" class="muted"></span><button class="ghost" id="out">Sign out</button></div></header>
+<div id="msg" class="msg hide" role="status"></div>
+
+<section id="auth" class="card hide">
+  <h2 id="authTitle">Sign in to your portal</h2>
+  <div class="row">
+    <input id="name" class="hide" placeholder="Full name" autocomplete="name">
+    <input id="em" type="email" placeholder="Email" autocomplete="email">
+    <input id="pw" type="password" placeholder="Password (8+ characters)" autocomplete="current-password">
+  </div>
+  <label class="chk hide" id="consentRow"><input type="checkbox" id="consent"> I agree that ALL may store and process the financial information I enter in order to organise it for me. I can ask for my data to be deleted at any time.</label>
+  <div class="row" style="margin-top:10px"><button id="go">Sign in</button><button class="ghost" id="toggle">Create an account</button></div>
+  <p class="muted">Never enter bank PINs, mobile money PINs, card numbers or passwords here.</p>
+</section>
+
+<section id="app" class="hide">
+  <div id="adminBar" class="card hide"><h2>Client view</h2><div class="row"><select id="clientSel"></select></div><p class="muted" id="viewing"></p></div>
+
+  <div class="card"><h2>Summary</h2><div class="stats" id="stats"></div></div>
+
+  <div class="card"><h2>Accounts</h2>
+    <div class="row"><input id="aName" placeholder="Account name, e.g. Stanbic, MTN MoMo"><select id="aType"><option value="bank">Bank</option><option value="mobile_money">Mobile money</option><option value="cash">Cash</option><option value="sacco">SACCO</option><option value="investment">Investment</option><option value="other">Other</option></select><input id="aBal" type="number" placeholder="Opening balance (UGX)"><button id="aAdd">Add account</button></div>
+    <div class="table"><table><thead><tr><th>Name</th><th>Type</th><th class="n">Balance</th><th></th></tr></thead><tbody id="aBody"></tbody></table></div>
+  </div>
+
+  <div class="card"><h2>Income and expenses</h2>
+    <div class="row"><input id="tDate" type="date"><input id="tDesc" placeholder="Description"><select id="tKind"><option value="expense">Expense</option><option value="income">Income</option></select><input id="tCat" placeholder="Category"><input id="tAmt" type="number" placeholder="Amount (UGX)"><select id="tAcc"></select><button id="tAdd">Add</button></div>
+    <div class="table"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="n">Amount</th><th></th></tr></thead><tbody id="tBody"></tbody></table></div>
+  </div>
+
+  <div class="card"><h2>Debts</h2>
+    <div class="row"><input id="dName" placeholder="Debt name"><input id="dLender" placeholder="Lender"><input id="dBal" type="number" placeholder="Balance (UGX)"><input id="dRate" type="number" placeholder="Interest % per year"><input id="dPay" type="number" placeholder="Monthly payment"><button id="dAdd">Add debt</button></div>
+    <div class="table"><table><thead><tr><th>Debt</th><th>Lender</th><th class="n">Balance</th><th class="n">Rate %</th><th class="n">Monthly</th><th></th></tr></thead><tbody id="dBody"></tbody></table></div>
+  </div>
+
+  <div class="card"><h2>Notes from your advisor</h2><div id="nList" class="muted">No notes yet.</div>
+    <div id="nAdd" class="row hide" style="margin-top:10px"><input id="nText" placeholder="Write a note for this client"><button id="nBtn">Add note</button></div>
+  </div>
+</section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://lapvvnbgugbmigsjrqfv.supabase.co";
+const SUPABASE_KEY = "sb_publishable_XY2PSzvAv9m5j1Ok9EnjRA_BrgTm-RU";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => Number(n || 0).toLocaleString("en-UG", {maximumFractionDigits: 0});
+let me = null, isAdmin = false, viewId = null, signup = false;
+
+function say(t, bad) { const m = $("msg"); m.textContent = t || ""; m.classList.toggle("hide", !t); m.style.borderColor = bad ? "var(--red)" : "var(--line)"; }
+function show(authed) { $("auth").classList.toggle("hide", authed); $("app").classList.toggle("hide", !authed); $("who").classList.toggle("hide", !authed); }
+
+function setMode(s) {
+  signup = s;
+  $("authTitle").textContent = s ? "Create your account" : "Sign in to your portal";
+  $("go").textContent = s ? "Create account" : "Sign in";
+  $("toggle").textContent = s ? "I already have an account" : "Create an account";
+  $("name").classList.toggle("hide", !s);
+  $("consentRow").classList.toggle("hide", !s);
+  $("pw").autocomplete = s ? "new-password" : "current-password";
+}
+$("toggle").onclick = () => { say(""); setMode(!signup); };
+
+$("go").onclick = async () => {
+  say("");
+  const email = $("em").value.trim(), password = $("pw").value;
+  if (!email || password.length < 8) return say("Enter your email and a password of at least 8 characters.", true);
+  if (signup) {
+    if (!$("consent").checked) return say("Please tick the consent box to continue.", true);
+    const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: $("name").value.trim() } } });
+    if (error) return say(error.message, true);
+    if (!data.session) return say("Account created. Check your email to confirm it, then sign in.");
+  } else {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return say("Sign in failed: " + error.message, true);
+  }
+  boot();
+};
+$("out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { show(false); setMode(false); return; }
+  me = session.user; viewId = me.id; $("email").textContent = me.email; show(true);
+  const meta = me.user_metadata || {};
+  await sb.from("all_profiles").upsert({ id: me.id, full_name: meta.full_name || null, consented_at: new Date().toISOString() }, { onConflict: "id", ignoreDuplicates: true });
+  const a = await sb.from("all_admins").select("user_id").eq("user_id", me.id).maybeSingle();
+  isAdmin = !!a.data;
+  $("adminBar").classList.toggle("hide", !isAdmin);
+  $("nAdd").classList.toggle("hide", !isAdmin);
+  if (isAdmin) await loadClients();
+  await loadAll();
+}
+
+async function loadClients() {
+  const { data } = await sb.from("all_profiles").select("id, full_name").order("created_at");
+  $("clientSel").innerHTML = (data || []).map(p => `<option value="${esc(p.id)}">${esc(p.full_name || p.id.slice(0, 8))}${p.id === me.id ? " (you)" : ""}</option>`).join("");
+  $("clientSel").value = me.id;
+  $("clientSel").onchange = () => { viewId = $("clientSel").value; loadAll(); };
+}
+
+async function loadAll() {
+  $("viewing").textContent = viewId === me.id ? "Viewing your own records." : "Viewing a client's records.";
+  const [ac, tx, db, nt] = await Promise.all([
+    sb.from("all_accounts").select("*").eq("user_id", viewId).order("created_at"),
+    sb.from("all_transactions").select("*").eq("user_id", viewId).order("txn_date", { ascending: false }).limit(200),
+    sb.from("all_debts").select("*").eq("user_id", viewId).order("created_at"),
+    sb.from("all_notes").select("*").eq("user_id", viewId).order("created_at", { ascending: false })
+  ]);
+  const err = ac.error || tx.error || db.error || nt.error;
+  if (err) return say("Could not load data: " + err.message, true);
+  const A = ac.data, T = tx.data, D = db.data, N = nt.data;
+  const bal = id => { const a = A.find(x => x.id === id); return Number(a.opening_balance) + T.filter(t => t.account_id === id).reduce((s, t) => s + (t.kind === "income" ? 1 : -1) * Number(t.amount), 0); };
+  const inc = T.filter(t => t.kind === "income").reduce((s, t) => s + Number(t.amount), 0);
+  const exp = T.filter(t => t.kind === "expense").reduce((s, t) => s + Number(t.amount), 0);
+  const assets = A.reduce((s, a) => s + bal(a.id), 0), debt = D.reduce((s, d) => s + Number(d.balance), 0);
+  $("stats").innerHTML = [["Total income", inc], ["Total expenses", exp], ["Net savings", inc - exp], ["Account balances", assets], ["Debts owed", debt], ["Net worth", assets - debt]]
+    .map(([l, v]) => `<div class="stat"><b>UGX ${fmt(v)}</b><span>${l}</span></div>`).join("");
+  $("aBody").innerHTML = A.map(a => `<tr><td>${esc(a.name)}</td><td>${esc(a.type.replace("_", " "))}</td><td class="n">${fmt(bal(a.id))}</td><td><button class="x" data-t="all_accounts" data-id="${a.id}" aria-label="Delete account">x</button></td></tr>`).join("") || `<tr><td colspan="4" class="muted">Add your first account above.</td></tr>`;
+  $("tAcc").innerHTML = `<option value="">No account</option>` + A.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
+  $("tBody").innerHTML = T.map(t => `<tr><td>${esc(t.txn_date)}</td><td>${esc(t.description)}</td><td>${esc(t.category)}</td><td class="n ${t.kind === "income" ? "inc" : "exp"}">${t.kind === "income" ? "+" : "-"}${fmt(t.amount)}</td><td><button class="x" data-t="all_transactions" data-id="${t.id}" aria-label="Delete entry">x</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">No entries yet.</td></tr>`;
+  $("dBody").innerHTML = D.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.lender)}</td><td class="n">${fmt(d.balance)}</td><td class="n">${esc(d.interest_rate ?? "")}</td><td class="n">${fmt(d.monthly_payment)}</td><td><button class="x" data-t="all_debts" data-id="${d.id}" aria-label="Delete debt">x</button></td></tr>`).join("") || `<tr><td colspan="6" class="muted">No debts recorded.</td></tr>`;
+  $("nList").innerHTML = N.length ? N.map(n => `<p><span class="muted">${esc(n.created_at.slice(0, 10))}</span><br>${esc(n.note)}</p>`).join("") : "No notes yet.";
+  document.querySelectorAll("button.x").forEach(b => b.onclick = async () => {
+    if (!confirm("Delete this record?")) return;
+    const { error } = await sb.from(b.dataset.t).delete().eq("id", b.dataset.id);
+    error ? say(error.message, true) : loadAll();
+  });
+}
+
+async function add(table, row) { say(""); const { error } = await sb.from(table).insert({ user_id: viewId, ...row }); error ? say(error.message, true) : loadAll(); return !error; }
+const num = v => v === "" ? null : Number(v);
+$("tDate").valueAsDate = new Date();
+$("aAdd").onclick = async () => { if (!$("aName").value.trim()) return say("Give the account a name.", true); if (await add("all_accounts", { name: $("aName").value.trim(), type: $("aType").value, opening_balance: num($("aBal").value) || 0 })) { $("aName").value = ""; $("aBal").value = ""; } };
+$("tAdd").onclick = async () => { const amt = num($("tAmt").value); if (!$("tDesc").value.trim() || amt === null || amt < 0) return say("Add a description and a positive amount.", true); if (await add("all_transactions", { txn_date: $("tDate").value, description: $("tDesc").value.trim(), kind: $("tKind").value, category: $("tCat").value.trim() || null, amount: amt, account_id: $("tAcc").value || null })) { $("tDesc").value = ""; $("tAmt").value = ""; } };
+$("dAdd").onclick = async () => { if (!$("dName").value.trim()) return say("Give the debt a name.", true); if (await add("all_debts", { name: $("dName").value.trim(), lender: $("dLender").value.trim() || null, balance: num($("dBal").value) || 0, interest_rate: num($("dRate").value), monthly_payment: num($("dPay").value) })) ["dName", "dLender", "dBal", "dRate", "dPay"].forEach(i => $(i).value = ""); };
+$("nBtn").onclick = async () => { if (!$("nText").value.trim()) return; if (await add("all_notes", { note: $("nText").value.trim() })) $("nText").value = ""; };
+
+boot();
+</script>
+</body>
+</html>
