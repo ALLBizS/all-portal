@@ -20,6 +20,13 @@ input,select{flex:1;min-width:120px}
 button{cursor:pointer;background:var(--teal);color:#fff;border-color:var(--teal);font-weight:600}
 @media (prefers-color-scheme:dark){button{color:#0F1B26}}
 button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.tabs{margin-bottom:16px}
+.tabs button.on{background:var(--teal);color:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;border:1px solid var(--line);font-size:13px}
+textarea{font:inherit;width:100%;min-height:110px;padding:9px 10px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--ink)}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px;margin:8px 0}
+.opts label{display:flex;gap:8px;align-items:flex-start}
+.opts input{flex:none;min-width:0;margin-top:5px}
 button.x{background:transparent;color:var(--red);border:0;padding:2px 8px}
 :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
@@ -58,6 +65,13 @@ label.chk input{flex:none;min-width:0;margin-top:4px}
 <section id="app" class="hide">
   <div id="adminBar" class="card hide"><h2>Client view</h2><div class="row"><select id="clientSel"></select></div><p class="muted" id="viewing"></p></div>
 
+  <div class="row tabs" id="tabs">
+    <button class="on" data-tab="overview">Overview</button>
+    <button class="ghost" data-tab="inquiry">Requests</button>
+    <button class="ghost" data-tab="docs">Documents</button>
+    <button class="ghost" data-tab="mail">Emails</button>
+  </div>
+  <div id="tab-overview">
   <div class="card"><h2>Summary</h2><div class="stats" id="stats"></div></div>
 
   <div class="card"><h2>Accounts</h2>
@@ -77,6 +91,45 @@ label.chk input{flex:none;min-width:0;margin-top:4px}
 
   <div class="card"><h2>Notes from your advisor</h2><div id="nList" class="muted">No notes yet.</div>
     <div id="nAdd" class="row hide" style="margin-top:10px"><input id="nText" placeholder="Write a note for this client"><button id="nBtn">Add note</button></div>
+  </div>
+  </div>
+
+  <div id="tab-inquiry" class="hide">
+    <div class="card"><h2>New inquiry</h2>
+      <p class="muted">Tell ALL what you need help with. You will get a reply after your request is reviewed.</p>
+      <div class="opts" id="svcOpts">
+        <label><input type="checkbox" value="Reconciliation"> Reconciliation</label>
+        <label><input type="checkbox" value="System integration"> System integration</label>
+        <label><input type="checkbox" value="Data entry into an accounting system"> Data entry into an accounting system</label>
+        <label><input type="checkbox" value="Help choosing an accounting system"> Help choosing an accounting system</label>
+        <label><input type="checkbox" value="Reporting dashboard"> Reporting dashboard</label>
+        <label><input type="checkbox" value="Tax and compliance support"> Tax and compliance support</label>
+        <label><input type="checkbox" value="Something else"> Something else</label>
+      </div>
+      <div class="row">
+        <select id="rSys"><option value="">Accounting system (if any)</option><option>QuickBooks Online</option><option>Xero</option><option>Zoho Books</option><option>Tally</option><option>Sage</option><option>Excel or paper only</option><option>Not sure yet</option></select>
+      </div>
+      <label class="chk" style="margin:8px 0"><input type="checkbox" id="rQb"> I would like ALL to use QuickBooks Online for my books</label>
+      <textarea id="rDesc" placeholder="Describe what you want done, your timeline, and anything ALL should know."></textarea>
+      <div class="row" style="margin-top:10px"><button id="rSend">Send inquiry</button></div>
+      <p class="muted">After sending, go to Documents to upload the files you want ALL to review.</p>
+    </div>
+    <div class="card"><h2>Your requests</h2><div class="table"><table><thead><tr><th>Date</th><th>What was requested</th><th>System</th><th>Status</th></tr></thead><tbody id="rBody"></tbody></table></div></div>
+  </div>
+
+  <div id="tab-docs" class="hide">
+    <div class="card"><h2>Upload documents</h2>
+      <p class="muted">PDF, Excel, CSV, Word or images, up to 10 MB each. Do not upload passwords or PINs.</p>
+      <div class="row"><input type="file" id="fFiles" multiple><select id="fReq"></select><button id="fUp">Upload</button></div>
+    </div>
+    <div class="card"><h2>Files</h2><div class="table"><table><thead><tr><th>Date</th><th>File</th><th>From</th><th></th></tr></thead><tbody id="fBody"></tbody></table></div></div>
+  </div>
+
+  <div id="tab-mail" class="hide">
+    <div class="card"><h2>Send information by email</h2>
+      <p id="inboxInfo" class="muted"></p>
+    </div>
+    <div class="card"><h2>Emails received</h2><div class="table"><table><thead><tr><th>Date</th><th>From</th><th>Subject</th><th>Attachments</th></tr></thead><tbody id="mBody"></tbody></table></div></div>
   </div>
 </section>
 </div>
@@ -170,7 +223,73 @@ async function loadAll() {
     const { error } = await sb.from(b.dataset.t).delete().eq("id", b.dataset.id);
     error ? say(error.message, true) : loadAll();
   });
+  loadExtra();
 }
+
+const INBOX_EMAIL = ""; // set when the shared inbox is ready
+const BADGE = { new: "New", reviewing: "Reviewing", in_progress: "In progress", ready_for_review: "Ready for review", completed: "Completed", cancelled: "Cancelled" };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach(x => { x.classList.toggle("on", x === b); x.classList.toggle("ghost", x !== b); });
+  ["overview", "inquiry", "docs", "mail"].forEach(t => $("tab-" + t).classList.toggle("hide", t !== b.dataset.tab));
+});
+
+async function loadExtra() {
+  const [rq, dc, em] = await Promise.all([
+    sb.from("all_requests").select("*").eq("user_id", viewId).order("created_at", { ascending: false }),
+    sb.from("all_documents").select("*").eq("user_id", viewId).order("created_at", { ascending: false }),
+    sb.from("all_emails").select("*").eq("user_id", viewId).order("received_at", { ascending: false }).limit(100)
+  ]);
+  const err = rq.error || dc.error || em.error;
+  if (err) return say("Could not load requests or files: " + err.message, true);
+  const R = rq.data, Dc = dc.data;
+  $("rBody").innerHTML = R.map(r => `<tr><td>${esc(r.created_at.slice(0, 10))}</td><td>${esc(r.services.join(", "))}<br><span class="muted">${esc(r.description)}</span>${r.wants_quickbooks ? '<br><span class="muted">Wants QuickBooks Online</span>' : ""}</td><td>${esc(r.accounting_system || "")}</td><td>${isAdmin ? `<select data-rid="${r.id}">${Object.entries(BADGE).map(([k, v]) => `<option value="${k}"${k === r.status ? " selected" : ""}>${v}</option>`).join("")}</select>` : `<span class="badge">${esc(BADGE[r.status] || r.status)}</span>`}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">No requests yet. Send your first inquiry above.</td></tr>`;
+  document.querySelectorAll("select[data-rid]").forEach(sel => sel.onchange = async () => {
+    const { error } = await sb.from("all_requests").update({ status: sel.value, updated_at: new Date().toISOString() }).eq("id", sel.dataset.rid);
+    error ? say(error.message, true) : say("Status updated.");
+  });
+  $("fReq").innerHTML = `<option value="">Not linked to a request</option>` + R.map(r => `<option value="${r.id}">${esc(r.created_at.slice(0, 10))}: ${esc(r.services.join(", ").slice(0, 40))}</option>`).join("");
+  $("fBody").innerHTML = Dc.map(d => `<tr><td>${esc(d.created_at.slice(0, 10))}</td><td>${esc(d.file_name)}</td><td>${d.uploaded_by_admin ? "ALL" : "Client"}</td><td><button class="ghost" data-open="${esc(d.storage_path)}">Open</button> <button class="x" data-fdel="${d.id}" data-path="${esc(d.storage_path)}" aria-label="Delete file">x</button></td></tr>`).join("") || `<tr><td colspan="4" class="muted">No files yet.</td></tr>`;
+  document.querySelectorAll("button[data-open]").forEach(b => b.onclick = async () => {
+    const { data, error } = await sb.storage.from("all-client-docs").createSignedUrl(b.dataset.open, 60);
+    error ? say(error.message, true) : window.open(data.signedUrl, "_blank", "noopener");
+  });
+  document.querySelectorAll("button[data-fdel]").forEach(b => b.onclick = async () => {
+    if (!confirm("Delete this file?")) return;
+    await sb.storage.from("all-client-docs").remove([b.dataset.path]);
+    const { error } = await sb.from("all_documents").delete().eq("id", b.dataset.fdel);
+    error ? say(error.message, true) : loadExtra();
+  });
+  $("inboxInfo").innerHTML = INBOX_EMAIL ? `Email documents and questions to <b>${esc(INBOX_EMAIL)}</b> from the address you registered with. They will appear below and ALL will review them.` : "The shared inbox for emailing documents is being set up. For now, please use the Documents tab to upload files.";
+  let mails = em.data;
+  if (isAdmin && viewId === me.id) { const u = await sb.from("all_emails").select("*").is("user_id", null).order("received_at", { ascending: false }).limit(100); mails = mails.concat(u.data || []); }
+  $("mBody").innerHTML = mails.map(m => `<tr><td>${esc(m.received_at.slice(0, 10))}</td><td>${esc(m.from_email)}${m.user_id ? "" : ' <span class="muted">(no matching client)</span>'}</td><td>${esc(m.subject)}</td><td>${esc((m.attachment_names || []).join(", "))}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">No emails yet.</td></tr>`;
+}
+
+$("rSend").onclick = async () => {
+  const services = [...document.querySelectorAll("#svcOpts input:checked")].map(i => i.value);
+  const description = $("rDesc").value.trim();
+  if (!services.length) return say("Choose at least one service.", true);
+  if (description.length < 10) return say("Please describe what you need in a few words.", true);
+  if (await add("all_requests", { services, description, accounting_system: $("rSys").value || null, wants_quickbooks: $("rQb").checked })) {
+    document.querySelectorAll("#svcOpts input").forEach(i => i.checked = false); $("rDesc").value = ""; $("rQb").checked = false; $("rSys").value = "";
+    say("Inquiry sent. You can now upload your files in the Documents tab.");
+  }
+};
+
+$("fUp").onclick = async () => {
+  const files = [...$("fFiles").files];
+  if (!files.length) return say("Choose one or more files first.", true);
+  say("Uploading...");
+  for (const f of files) {
+    if (f.size > 10 * 1024 * 1024) { say(f.name + " is larger than 10 MB.", true); continue; }
+    const path = `${viewId}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g, "_")}`;
+    const up = await sb.storage.from("all-client-docs").upload(path, f);
+    if (up.error) { say(f.name + ": " + up.error.message, true); continue; }
+    const { error } = await sb.from("all_documents").insert({ user_id: viewId, request_id: $("fReq").value || null, file_name: f.name, storage_path: path, uploaded_by_admin: isAdmin && viewId !== me.id });
+    if (error) say(error.message, true);
+  }
+  $("fFiles").value = ""; say("Upload finished."); loadExtra();
+};
 
 async function add(table, row) { say(""); const { error } = await sb.from(table).insert({ user_id: viewId, ...row }); error ? say(error.message, true) : loadAll(); return !error; }
 const num = v => v === "" ? null : Number(v);
